@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF 拼接工具</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --border: #dbe3f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #eef4ff 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 40px 20px 56px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 42px);
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+      padding: 22px;
+    }
+
+    .dropzone {
+      border: 2px dashed #b8c6e3;
+      border-radius: 18px;
+      padding: 28px;
+      text-align: center;
+      background: #f8fbff;
+      transition: 0.2s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: #eef4ff;
+    }
+
+    .dropzone p {
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    input[type="file"] { max-width: 100%; }
+
+    button, .download-link {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: 0.2s ease;
+    }
+
+    button.primary, .download-link {
+      background: var(--primary);
+      color: white;
+    }
+
+    button.primary:hover, .download-link:hover { background: var(--primary-hover); }
+
+    button.secondary {
+      background: #e8eef9;
+      color: #0f172a;
+    }
+
+    button.secondary:hover { background: #dce6f8; }
+
+    button:disabled, .download-link.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .status {
+      margin-top: 16px;
+      min-height: 24px;
+      color: var(--muted);
+    }
+
+    .status.success { color: var(--success); }
+    .status.error { color: var(--danger); }
+
+    .list {
+      list-style: none;
+      padding: 0;
+      margin: 18px 0 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: #fbfdff;
+    }
+
+    .item.active {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+
+    .item .meta {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .item .name {
+      font-weight: 600;
+      word-break: break-all;
+    }
+
+    .item .size {
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .item .actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .item .actions button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .preview-toolbar { margin-top: 20px; }
+
+    .footer {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hint { color: var(--muted); font-size: 14px; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(2px);
+    }
+
+    .modal-dialog {
+      position: relative;
+      z-index: 1;
+      width: min(1100px, 100%);
+      height: min(88vh, 900px);
+      background: #fff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #f8fbff;
+    }
+
+    .modal-title { font-weight: 700; font-size: 16px; }
+
+    .modal-name {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .preview-frame {
+      width: 100%;
+      flex: 1;
+      border: 0;
+      display: block;
+      background: white;
+    }
+
+    @media (max-width: 640px) {
+      .app { padding: 24px 14px 42px; }
+      .card { padding: 16px; }
+      .item { align-items: flex-start; flex-direction: column; }
+      .item .actions { width: 100%; }
+      .item .actions button { flex: 1; }
+      .modal { padding: 10px; }
+      .modal-dialog { height: 92vh; }
+      .footer { align-items: stretch; }
+      .footer > * { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <h1>PDF 拼接工具</h1>
+      <p class="subtitle">上传多个 PDF，按顺序合并为一个文件，然后一键下载。预览会在单独弹窗中打开。</p>
+    </section>
+
+    <section class="card">
+      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="上传 PDF 文件区域">
+        <strong>拖拽 PDF 到这里</strong>
+        <p>或者点击下面的选择按钮，支持一次选择多个 PDF 文件。</p>
+        <div class="controls">
+          <input id="fileInput" type="file" accept="application/pdf,.pdf" multiple />
+          <button id="mergeBtn" class="primary" type="button">开始拼接</button>
+          <button id="clearBtn" class="secondary" type="button">清空列表</button>
+        </div>
+      </div>
+
+      <div id="status" class="status">尚未选择文件。</div>
+
+      <ul id="fileList" class="list" aria-live="polite"></ul>
+
+      <div class="preview-toolbar">
+        <div class="hint">点击列表中的“预览”按钮，会在独立弹窗中查看 PDF。</div>
+      </div>
+
+      <div class="footer">
+        <div class="hint">提示：文件顺序会影响合并后的页面顺序，可在列表中调整。</div>
+        <a id="downloadLink" class="download-link disabled" href="#" download="merged.pdf">下载合并后的 PDF</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="previewModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-preview></div>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="PDF 预览弹窗">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">PDF 预览</div>
+          <div id="previewName" class="modal-name">未选择文件</div>
+        </div>
+        <button id="closePreviewBtn" class="secondary" type="button">关闭</button>
+      </div>
+      <iframe id="previewFrame" class="preview-frame" title="PDF 预览"></iframe>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script>
+    const { PDFDocument } = PDFLib;
+
+    const fileInput = document.getElementById('fileInput');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const fileList = document.getElementById('fileList');
+    const status = document.getElementById('status');
+    const dropzone = document.getElementById('dropzone');
+    const downloadLink = document.getElementById('downloadLink');
+    const previewFrame = document.getElementById('previewFrame');
+    const previewName = document.getElementById('previewName');
+    const previewModal = document.getElementById('previewModal');
+    const closePreviewBtn = document.getElementById('closePreviewBtn');
+
+    let selectedFiles = [];
+    let downloadUrl = null;
+    let previewUrl = null;
+    let previewFileIndex = -1;
+
+    function formatSize(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let value = bytes;
+      let index = 0;
+      while (value >= 1024 && index < units.length - 1) {
+        value /= 1024;
+        index += 1;
+      }
+      return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    function setStatus(message, type = '') {
+      status.textContent = message;
+      status.className = `status ${type}`.trim();
+    }
+
+    function updateDownloadLink(url) {
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      downloadUrl = url;
+      downloadLink.href = url;
+      downloadLink.classList.remove('disabled');
+    }
+
+    function resetDownloadLink() {
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      downloadUrl = null;
+      downloadLink.href = '#';
+      downloadLink.classList.add('disabled');
+    }
+
+    function resetPreview() {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      previewFileIndex = -1;
+      previewFrame.src = 'about:blank';
+      previewName.textContent = '未选择文件';
+      previewModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function showPreview(index) {
+      const file = selectedFiles[index];
+      if (!file) return;
+
+      previewFileIndex = index;
+      previewName.textContent = file.name;
+
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      previewFrame.src = previewUrl;
+      previewModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closePreview() {
+      previewModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function renderList() {
+      fileList.innerHTML = '';
+      selectedFiles.forEach((file, index) => {
+        const item = document.createElement('li');
+        item.className = index === previewFileIndex ? 'item active' : 'item';
+        item.innerHTML = `
+          <div class="meta">
+            <div class="name">${index === previewFileIndex ? '▶ ' : ''}${file.name}</div>
+            <div class="size">${formatSize(file.size)}</div>
+          </div>
+          <div class="actions">
+            <button type="button" class="secondary" data-action="preview" data-index="${index}">预览</button>
+            <button type="button" class="secondary" data-action="up" data-index="${index}">上移</button>
+            <button type="button" class="secondary" data-action="down" data-index="${index}">下移</button>
+            <button type="button" class="secondary" data-action="remove" data-index="${index}">删除</button>
+          </div>
+        `;
+        fileList.appendChild(item);
+      });
+      mergeBtn.disabled = selectedFiles.length === 0;
+      clearBtn.disabled = selectedFiles.length === 0;
+    }
+
+    function addFiles(files) {
+      const pdfFiles = Array.from(files).filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
+      if (pdfFiles.length === 0) {
+        setStatus('请选择 PDF 文件。', 'error');
+        return;
+      }
+
+      selectedFiles = [...selectedFiles, ...pdfFiles];
+      resetDownloadLink();
+      renderList();
+      setStatus(`已添加 ${pdfFiles.length} 个文件，当前共 ${selectedFiles.length} 个。`);
+    }
+
+    function moveFile(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= selectedFiles.length) return;
+      [selectedFiles[index], selectedFiles[targetIndex]] = [selectedFiles[targetIndex], selectedFiles[index]];
+      if (previewFileIndex === index) previewFileIndex = targetIndex;
+      else if (previewFileIndex === targetIndex) previewFileIndex = index;
+      resetDownloadLink();
+      renderList();
+    }
+
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      resetDownloadLink();
+
+      if (selectedFiles.length === 0) {
+        resetPreview();
+      } else if (previewFileIndex === index) {
+        previewFileIndex = -1;
+      } else if (previewFileIndex > index) {
+        previewFileIndex -= 1;
+      }
+
+      renderList();
+      setStatus(selectedFiles.length ? `已删除文件，当前共 ${selectedFiles.length} 个。` : '尚未选择文件。');
+    }
+
+    async function mergePdfFiles() {
+      if (selectedFiles.length === 0) {
+        setStatus('请先选择至少一个 PDF 文件。', 'error');
+        return;
+      }
+
+      mergeBtn.disabled = true;
+      clearBtn.disabled = true;
+      setStatus('正在拼接 PDF，请稍候...');
+
+      try {
+        const mergedPdf = await PDFDocument.create();
+        for (const file of selectedFiles) {
+          const arrayBuffer = await file.arrayBuffer();
+          const sourcePdf = await PDFDocument.load(arrayBuffer);
+          const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+          copiedPages.forEach((page) => mergedPdf.addPage(page));
+        }
+
+        const mergedBytes = await mergedPdf.save();
+        const blob = new Blob([mergedBytes], { type: 'application/pdf' });
+        updateDownloadLink(URL.createObjectURL(blob));
+        setStatus('拼接完成，可以下载了。', 'success');
+      } catch (error) {
+        console.error(error);
+        setStatus('拼接失败，请确认所选文件都是有效的 PDF。', 'error');
+      } finally {
+        renderList();
+      }
+    }
+
+    fileInput.addEventListener('change', (event) => {
+      addFiles(event.target.files);
+      event.target.value = '';
+    });
+
+    mergeBtn.addEventListener('click', mergePdfFiles);
+
+    clearBtn.addEventListener('click', () => {
+      selectedFiles = [];
+      fileInput.value = '';
+      resetDownloadLink();
+      resetPreview();
+      renderList();
+      setStatus('已清空列表。');
+    });
+
+    fileList.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const index = Number(button.dataset.index);
+      const action = button.dataset.action;
+
+      if (action === 'preview') showPreview(index);
+      if (action === 'up') moveFile(index, -1);
+      if (action === 'down') moveFile(index, 1);
+      if (action === 'remove') removeFile(index);
+    });
+
+    closePreviewBtn.addEventListener('click', closePreview);
+    previewModal.addEventListener('click', (event) => {
+      if (event.target && event.target.hasAttribute('data-close-preview')) closePreview();
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !previewModal.classList.contains('hidden')) closePreview();
+    });
+
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (event) => {
+      addFiles(event.dataTransfer.files);
+    });
+
+    dropzone.addEventListener('click', (event) => {
+      if (event.target === fileInput || event.target === mergeBtn || event.target === clearBtn) return;
+      fileInput.click();
+    });
+
+    dropzone.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
+
+    renderList();
+  </script>
+</body>
+</html>
